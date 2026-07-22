@@ -5,3 +5,5 @@ __pycache__/
 .DS_Store
 dist/
 build/
+Arcane Dominion/
+build_pack.py
