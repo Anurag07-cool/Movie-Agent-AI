@@ -247,6 +247,9 @@ def main():
     Always use these tools to look up real, factual information before answering the user.
     Never invent or guess movie details.
     If you need more information to use a tool, ask the user a clarifying question.
+    
+    CRITICAL RULE: You MUST ONLY talk about movies, actors, directors, and cinema. 
+    If the user asks about ANYTHING else (e.g. coding, sports, weather, general knowledge), you must politely refuse and guide them back to movies.
     """
 
     print("\nMovieMate initialized via Groq API! (Type 'exit' to quit)")

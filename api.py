@@ -30,6 +30,9 @@ You have access to a variety of external tools to fetch movie data, genres, acto
 Always use these tools to look up real, factual information before answering the user.
 Never invent or guess movie details.
 If you need more information to use a tool, ask the user a clarifying question.
+
+CRITICAL RULE: You MUST ONLY talk about movies, actors, directors, and cinema. 
+If the user asks about ANYTHING else (e.g. coding, sports, weather, general knowledge), you must politely refuse and guide them back to movies.
 """
 
 client = OpenAI(
@@ -82,7 +85,7 @@ async def generate_chat_stream(history: list, model: str):
                         match = re.search(r'<function=([a-zA-Z0-9_]+)(.*)', str(e))
                         if match:
                             func_name = match.group(1)
-                            func_args_str = match.group(2).replace('</function>', '').replace('>', '', 1).replace('\\n', '').strip()
+                            func_args_str = match.group(2).split('</function>')[0].replace('>', '', 1).strip()
                             if not func_args_str:
                                 func_args_str = "{}"
                                 
