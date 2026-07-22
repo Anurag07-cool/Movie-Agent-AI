@@ -63,16 +63,41 @@ async def generate_chat_stream(history: list):
     yield f"data: {json.dumps({'type': 'thinking'})}\n\n"
     
     try:
-        while True:
-            # We must use run_in_executor to not block the async event loop with synchronous OpenAI calls
-            response = await asyncio.to_thread(
-                client.chat.completions.create,
-                model="llama-3.1-8b-instant",
-                messages=messages,
-                tools=tools,
-                temperature=0.1
-            )
+        max_iterations = 5
+        iterations = 0
+        
+        while iterations < max_iterations:
+            iterations += 1
             
+            # Rate limit retry loop
+            max_retries = 3
+            retry_count = 0
+            response = None
+            
+            while retry_count < max_retries:
+                try:
+                    # We must use run_in_executor to not block the async event loop with synchronous OpenAI calls
+                    response = await asyncio.to_thread(
+                        client.chat.completions.create,
+                        model="llama-3.1-8b-instant",
+                        messages=messages,
+                        tools=tools,
+                        temperature=0.1
+                    )
+                    break
+                except Exception as e:
+                    error_str = str(e).lower()
+                    if "rate limit" in error_str or "429" in error_str:
+                        retry_count += 1
+                        yield f"data: {json.dumps({'type': 'tool_running', 'tool': f'Rate limit reached. Waiting 3s (Retry {retry_count}/{max_retries})...'})}\n\n"
+                        await asyncio.sleep(3)
+                    else:
+                        raise e
+            
+            if not response:
+                yield f"data: {json.dumps({'type': 'error', 'content': 'Rate limit exceeded. Please try again later.'})}\n\n"
+                break
+                
             response_message = response.choices[0].message
             
             if not response_message.tool_calls:
@@ -118,6 +143,10 @@ async def generate_chat_stream(history: list):
                     })
                     yield f"data: {json.dumps({'type': 'tool_done', 'tool': f'{function_name}()', 'result': 'error'})}\n\n"
                     
+        # If we broke out of loop due to max_iterations
+        if iterations >= max_iterations:
+            yield f"data: {json.dumps({'type': 'final_answer', 'content': 'I had to stop searching because I reached my limit. Here is the information I found so far.'})}\n\n"
+            
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
 
