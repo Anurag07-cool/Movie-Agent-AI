@@ -5,6 +5,8 @@ from pydantic import BaseModel
 import json
 import asyncio
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from openai import OpenAI
 from agent import AVAILABLE_FUNCTIONS, tools
 
