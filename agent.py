@@ -306,8 +306,21 @@ def main():
                     print(response_message.content)
                     break
                 
+                clean_msg = {
+                    "role": "assistant",
+                    "content": response_message.content or ""
+                }
+                if hasattr(response_message, "tool_calls") and response_message.tool_calls:
+                    clean_msg["tool_calls"] = [
+                        {
+                            "id": tc.id, 
+                            "type": "function", 
+                            "function": {"name": tc.function.name, "arguments": tc.function.arguments}
+                        } for tc in response_message.tool_calls
+                    ]
+                
                 # Append the assistant's tool call message
-                messages.append(response_message)
+                messages.append(clean_msg)
                 
                 # Execute tools and append results
                 for tool_call in response_message.tool_calls:

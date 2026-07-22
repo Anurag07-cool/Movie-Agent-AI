@@ -135,12 +135,19 @@ async def generate_chat_stream(history: list, model: str):
                 yield f"data: {json.dumps({'type': 'final_answer', 'content': response_message.content})}\n\n"
                 break
                 
-            if hasattr(response_message, "dict"):
-                messages.append(response_message.dict())
-            elif hasattr(response_message, "model_dump"):
-                messages.append(response_message.model_dump())
-            else:
-                messages.append(response_message)
+            clean_msg = {
+                "role": "assistant",
+                "content": response_message.content or ""
+            }
+            if hasattr(response_message, "tool_calls") and response_message.tool_calls:
+                clean_msg["tool_calls"] = [
+                    {
+                        "id": tc.id, 
+                        "type": "function", 
+                        "function": {"name": tc.function.name, "arguments": tc.function.arguments}
+                    } for tc in response_message.tool_calls
+                ]
+            messages.append(clean_msg)
             
             for tool_call in response_message.tool_calls:
                 function_name = tool_call.function.name
