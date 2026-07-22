@@ -22,6 +22,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     messages: list
+    model: str = "llama-3.3-70b-versatile"
 
 system_instruction = """
 You are MovieMate, an autonomous AI Movie Recommendation Agent.
@@ -34,11 +35,11 @@ AGENT RULES:
 Rule 1: Never invent movie information. If information can be retrieved from a tool, call the tool.
 Rule 2: If the user asks multiple questions, call multiple tools in sequence.
 Rule 3: If one tool depends on another, always execute them in order.
-Rule 4: If the user asks "Best action movies", use search_by_genre("Action") NOT search_movie().
-Rule 5: If the user asks "Movies starring Tom Cruise", use search_by_actor().
-Rule 6: If the user asks "What's trending today?", use get_trending_movies().
-Rule 7: If the user asks "Where can I watch Oppenheimer?", Tool sequence: search_movie() -> get_streaming_platform().
-Rule 8: If the user asks "Should I watch Interstellar?", Tool sequence: search_movie() -> get_movie_details() -> get_reviews() -> Generate a balanced recommendation.
+Rule 4: If the user asks for movies by genre (e.g. "Best action movies"), use the search_by_genre tool.
+Rule 5: If the user asks for movies by an actor, use the search_by_actor tool.
+Rule 6: If the user asks what is trending, use the get_trending_movies tool.
+Rule 7: If the user asks where to watch a movie, first use search_movie, then use get_streaming_platform.
+Rule 8: To evaluate a movie, use search_movie, then get_movie_details, then get_reviews.
 Rule 9: If information is missing, ask ONE clarification question.
 Rule 10: You may call multiple tools until enough information is collected. Only after all required tools have been executed should you generate the final response.
 
@@ -51,7 +52,7 @@ client = OpenAI(
     api_key=os.environ.get("GROQ_API_KEY", "your-groq-api-key"),
 )
 
-async def generate_chat_stream(history: list):
+async def generate_chat_stream(history: list, model: str):
     # Prepare the message payload for Groq
     messages = [{"role": "system", "content": system_instruction}]
     
@@ -79,7 +80,7 @@ async def generate_chat_stream(history: list):
                     # We must use run_in_executor to not block the async event loop with synchronous OpenAI calls
                     response = await asyncio.to_thread(
                         client.chat.completions.create,
-                        model="llama-3.1-8b-instant",
+                        model=model,
                         messages=messages,
                         tools=tools,
                         temperature=0.1
@@ -152,7 +153,7 @@ async def generate_chat_stream(history: list):
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
-    return StreamingResponse(generate_chat_stream(request.messages), media_type="text/event-stream")
+    return StreamingResponse(generate_chat_stream(request.messages, request.model), media_type="text/event-stream")
 
 if __name__ == "__main__":
     import uvicorn

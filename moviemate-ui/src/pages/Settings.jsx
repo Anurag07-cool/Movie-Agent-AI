@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Key, Sliders, Moon, Trash2, Shield, Eye, EyeOff } from 'lucide-react';
 
 export default function Settings() {
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState('gsk_**************************************');
-  const [model, setModel] = useState('llama-3.1-8b-instant');
+  const [model, setModel] = useState(() => localStorage.getItem('moviemate_model') || 'llama-3.3-70b-versatile');
+  
+  useEffect(() => {
+    localStorage.setItem('moviemate_model', model);
+  }, [model]);
   const [temperature, setTemperature] = useState(0.1);
 
   const handleClearHistory = () => {

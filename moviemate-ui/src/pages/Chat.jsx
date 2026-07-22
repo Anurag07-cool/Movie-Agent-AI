@@ -81,11 +81,13 @@ export default function Chat() {
     const controller = new AbortController();
     setAbortController(controller);
     
+    const selectedModel = localStorage.getItem('moviemate_model') || 'llama-3.3-70b-versatile';
+
     try {
       const response = await fetch('http://127.0.0.1:8000/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: formattedMessages }),
+        body: JSON.stringify({ messages: formattedMessages, model: selectedModel }),
         signal: controller.signal
       });
 

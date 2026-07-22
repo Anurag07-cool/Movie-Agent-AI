@@ -252,11 +252,11 @@ def main():
     Rule 1: Never invent movie information. If information can be retrieved from a tool, call the tool.
     Rule 2: If the user asks multiple questions, call multiple tools in sequence.
     Rule 3: If one tool depends on another, always execute them in order (e.g. search_movie -> get_similar_movies).
-    Rule 4: If the user asks "Best action movies", use search_by_genre("Action") NOT search_movie().
-    Rule 5: If the user asks "Movies starring Tom Cruise", use search_by_actor().
-    Rule 6: If the user asks "What's trending today?", use get_trending_movies().
-    Rule 7: If the user asks "Where can I watch Oppenheimer?", Tool sequence: search_movie() -> get_streaming_platform().
-    Rule 8: If the user asks "Should I watch Interstellar?", Tool sequence: search_movie() -> get_movie_details() -> get_reviews() -> Generate a balanced recommendation.
+    Rule 4: If the user asks for movies by genre (e.g. "Best action movies"), use the search_by_genre tool.
+    Rule 5: If the user asks for movies by an actor, use the search_by_actor tool.
+    Rule 6: If the user asks what is trending, use the get_trending_movies tool.
+    Rule 7: If the user asks where to watch a movie, first use search_movie, then use get_streaming_platform.
+    Rule 8: To evaluate a movie, use search_movie, then get_movie_details, then get_reviews.
     Rule 9: If information is missing, ask ONE clarification question.
     Rule 10: You may call multiple tools until enough information is collected. Only after all required tools have been executed should you generate the final response.
 
@@ -279,14 +279,40 @@ def main():
         ]
 
         try:
-            while True:
-                response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=messages,
-                    tools=tools,
-                    temperature=0.1
-                )
+            import time
+            iterations = 0
+            max_iterations = 10
+    
+            while iterations < max_iterations:
+                iterations += 1
                 
+                # Add retry logic for rate limits
+                max_retries = 3
+                retry_count = 0
+                response = None
+                
+                while retry_count < max_retries:
+                    try:
+                        response = client.chat.completions.create(
+                            model="llama-3.1-8b-instant",
+                            messages=messages,
+                            tools=tools,
+                            temperature=0.1
+                        )
+                        break
+                    except Exception as e:
+                        error_str = str(e).lower()
+                        if "rate limit" in error_str or "429" in error_str:
+                            retry_count += 1
+                            print(f"Rate limit reached. Waiting 3 seconds (Retry {retry_count}/{max_retries})...")
+                            time.sleep(3)
+                        else:
+                            raise e
+                            
+                if not response:
+                    print("Sorry, I am currently experiencing high traffic and hitting rate limits. Please try again in a few moments.")
+                    break
+                    
                 response_message = response.choices[0].message
                 
                 # If there are no tool calls, this is the final answer
