@@ -77,6 +77,50 @@ async def generate_chat_stream(history: list, model: str):
                         retry_count += 1
                         yield f"data: {json.dumps({'type': 'tool_running', 'tool': f'Rate limit reached. Waiting 3s (Retry {retry_count}/{max_retries})...'})}\n\n"
                         await asyncio.sleep(3)
+                    elif "tool_use_failed" in error_str and "failed_generation" in error_str:
+                        import re
+                        match = re.search(r'<function=([a-zA-Z0-9_]+)(.*)', str(e))
+                        if match:
+                            func_name = match.group(1)
+                            func_args_str = match.group(2).replace('</function>', '').replace('>', '', 1).replace('\\n', '').strip()
+                            if not func_args_str:
+                                func_args_str = "{}"
+                                
+                            class DummyFunction:
+                                def __init__(self, name, arguments):
+                                    self.name = name
+                                    self.arguments = arguments
+                            class DummyToolCall:
+                                def __init__(self, id, function):
+                                    self.id = id
+                                    self.type = "function"
+                                    self.function = function
+                            class DummyMessage:
+                                def __init__(self, tool_calls):
+                                    self.role = "assistant"
+                                    self.content = None
+                                    self.tool_calls = tool_calls
+                                    
+                                def dict(self):
+                                    return {
+                                        "role": self.role,
+                                        "content": self.content,
+                                        "tool_calls": [{"id": tc.id, "type": tc.type, "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in self.tool_calls]
+                                    }
+                            class DummyChoice:
+                                def __init__(self, message):
+                                    self.message = message
+                            class DummyResponse:
+                                def __init__(self, choices):
+                                    self.choices = choices
+                                    
+                            import uuid
+                            t_id = "call_" + str(uuid.uuid4())[:8]
+                            dummy_msg = DummyMessage([DummyToolCall(t_id, DummyFunction(func_name, func_args_str))])
+                            response = DummyResponse([DummyChoice(dummy_msg)])
+                            break
+                        else:
+                            raise e
                     else:
                         raise e
             
@@ -91,7 +135,12 @@ async def generate_chat_stream(history: list, model: str):
                 yield f"data: {json.dumps({'type': 'final_answer', 'content': response_message.content})}\n\n"
                 break
                 
-            messages.append(response_message)
+            if hasattr(response_message, "dict"):
+                messages.append(response_message.dict())
+            elif hasattr(response_message, "model_dump"):
+                messages.append(response_message.model_dump())
+            else:
+                messages.append(response_message)
             
             for tool_call in response_message.tool_calls:
                 function_name = tool_call.function.name
