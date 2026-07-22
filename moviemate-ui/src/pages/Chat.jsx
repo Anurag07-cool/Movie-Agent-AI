@@ -4,35 +4,67 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Bot, User, PlayCircle, Loader2, CheckCircle2, StopCircle } from 'lucide-react';
 
 export default function Chat() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q');
+  const chatId = searchParams.get('id');
   
-  const [messages, setMessages] = useState(() => {
-    const saved = localStorage.getItem('moviemate_chat_history');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
+  const [abortController, setAbortController] = useState(null);
+
+  // Load session when ID changes
+  useEffect(() => {
+    if (chatId) {
+      const sessions = JSON.parse(localStorage.getItem('moviemate_sessions') || '[]');
+      const session = sessions.find(s => s.id === chatId);
+      if (session) {
+        setMessages(session.messages);
+      } else {
+        setMessages([]);
+      }
+    } else {
+      setMessages([]);
+    }
+  }, [chatId]);
 
   // Save to localStorage whenever messages change
   useEffect(() => {
-    localStorage.setItem('moviemate_chat_history', JSON.stringify(messages));
-  }, [messages]);
+    if (messages.length === 0 && !chatId) return; // Don't save empty new chats
+    
+    const sessions = JSON.parse(localStorage.getItem('moviemate_sessions') || '[]');
+    let currentId = chatId;
+    
+    if (!currentId) {
+      currentId = Date.now().toString();
+      // Update URL without full reload
+      setSearchParams({ id: currentId });
+    }
+    
+    const sessionData = {
+      id: currentId,
+      title: messages.length > 0 && messages[0].content ? (messages[0].content.substring(0, 40) + (messages[0].content.length > 40 ? '...' : '')) : "New Chat",
+      messages,
+      updatedAt: new Date().toISOString()
+    };
+    
+    const existingIndex = sessions.findIndex(s => s.id === currentId);
+    if (existingIndex >= 0) {
+      sessions[existingIndex] = sessionData;
+    } else {
+      sessions.unshift(sessionData);
+    }
+    
+    localStorage.setItem('moviemate_sessions', JSON.stringify(sessions));
+  }, [messages, chatId, setSearchParams]);
   
   useEffect(() => {
-    if (initialQuery && messages.length === 0) {
+    if (initialQuery && messages.length === 0 && !chatId) {
       setMessages([{ role: 'user', content: initialQuery }]);
       submitQuery(initialQuery, []);
+      searchParams.delete('q');
+      setSearchParams(searchParams);
     }
-  }, [initialQuery]);
-
-  const [abortController, setAbortController] = useState(null);
+  }, [initialQuery, chatId, searchParams, setSearchParams]);
 
   const submitQuery = async (query, history) => {
     // Add "thinking" state

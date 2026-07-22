@@ -49,7 +49,19 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <div className="flex-1 px-4 py-6 space-y-2">
+      <div className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        <NavLink 
+          to="/chat"
+          className="flex items-center space-x-3 px-4 py-3 mb-6 rounded-xl transition-all duration-300 group bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <div className="relative z-10 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </div>
+          {isExpanded && (
+            <span className="font-semibold relative z-10">New Chat</span>
+          )}
+        </NavLink>
+
         {navItems.map((item) => (
           <NavLink 
             key={item.path} 
