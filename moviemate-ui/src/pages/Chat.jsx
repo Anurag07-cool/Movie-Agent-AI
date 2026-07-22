@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, PlayCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { Send, Bot, User, PlayCircle, Loader2, CheckCircle2, StopCircle } from 'lucide-react';
 
 export default function Chat() {
   const [searchParams] = useSearchParams();
@@ -32,6 +32,8 @@ export default function Chat() {
     }
   }, [initialQuery]);
 
+  const [abortController, setAbortController] = useState(null);
+
   const submitQuery = async (query, history) => {
     // Add "thinking" state
     setMessages(prev => [...prev, { role: 'agent', content: '', isThinking: true, tools: [] }]);
@@ -44,11 +46,15 @@ export default function Chat() {
     // Append the current query
     formattedMessages.push({ role: 'user', content: query });
     
+    const controller = new AbortController();
+    setAbortController(controller);
+    
     try {
       const response = await fetch('http://127.0.0.1:8000/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: formattedMessages })
+        body: JSON.stringify({ messages: formattedMessages }),
+        signal: controller.signal
       });
 
       const reader = response.body.getReader();
@@ -68,24 +74,9 @@ export default function Chat() {
             if (data.type === 'thinking') {
               // already set initially
             } else if (data.type === 'tool_running') {
-              setMessages(prev => {
-                const newMsgs = [...prev];
-                const last = newMsgs[newMsgs.length - 1];
-                if (!last.tools) last.tools = [];
-                last.tools.push({ name: data.tool, status: 'running' });
-                return newMsgs;
-              });
+              // Intentionally hidden from UI
             } else if (data.type === 'tool_done') {
-              setMessages(prev => {
-                const newMsgs = [...prev];
-                const last = newMsgs[newMsgs.length - 1];
-                const toolIndex = last.tools.findIndex(t => t.name === data.tool && t.status === 'running');
-                if (toolIndex !== -1) {
-                  last.tools[toolIndex].status = 'done';
-                  last.tools[toolIndex].result = data.result;
-                }
-                return newMsgs;
-              });
+              // Intentionally hidden from UI
             } else if (data.type === 'final_answer') {
               setMessages(prev => {
                 const newMsgs = [...prev];
@@ -107,13 +98,25 @@ export default function Chat() {
         }
       }
     } catch (e) {
-      setMessages(prev => {
-        const newMsgs = [...prev];
-        const last = newMsgs[newMsgs.length - 1];
-        last.isThinking = false;
-        last.content = "Failed to connect to backend AI server.";
-        return newMsgs;
-      });
+      if (e.name === 'AbortError') {
+        setMessages(prev => {
+          const newMsgs = [...prev];
+          const last = newMsgs[newMsgs.length - 1];
+          last.isThinking = false;
+          if (!last.content) last.content = "Generation stopped by user.";
+          return newMsgs;
+        });
+      } else {
+        setMessages(prev => {
+          const newMsgs = [...prev];
+          const last = newMsgs[newMsgs.length - 1];
+          last.isThinking = false;
+          last.content = "Failed to connect to backend AI server.";
+          return newMsgs;
+        });
+      }
+    } finally {
+      setAbortController(null);
     }
   };
 
@@ -125,6 +128,13 @@ export default function Chat() {
     setMessages(prev => [...prev, { role: 'user', content: query }]);
     setInputValue('');
     submitQuery(query, messages);
+  };
+
+  const handleStop = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
   };
 
   return (
@@ -153,21 +163,6 @@ export default function Chat() {
                 </div>
                 
                 <div className="space-y-3">
-                  {/* Tool Execution UI */}
-                  {msg.tools && msg.tools.map((tool, i) => (
-                    <div key={i} className="glass-card px-4 py-3 text-sm flex items-center space-x-3 text-text-secondary">
-                      {tool.status === 'running' ? (
-                        <Loader2 size={16} className="animate-spin text-accent-blue" />
-                      ) : (
-                        <CheckCircle2 size={16} className="text-success" />
-                      )}
-                      <span className="font-mono text-xs bg-black/30 px-2 py-1 rounded-md border border-white/5">
-                        {tool.name}
-                      </span>
-                      {tool.status === 'running' && <span className="animate-pulse">Executing...</span>}
-                    </div>
-                  ))}
-
                   {/* Main Message Content */}
                   {msg.isThinking ? (
                     <div className="bg-card/50 px-6 py-4 rounded-2xl rounded-tl-sm border border-white/5 flex space-x-2 items-center">
@@ -205,9 +200,18 @@ export default function Chat() {
               placeholder="Message MovieMate..."
               className="flex-1 bg-transparent border-none outline-none text-white text-base py-3"
             />
+            {abortController ? (
+              <button 
+                type="button"
+                onClick={handleStop}
+                className="bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-xl p-3 transition-colors flex items-center justify-center mr-2"
+              >
+                <StopCircle size={20} />
+              </button>
+            ) : null}
             <button 
               type="submit"
-              disabled={!inputValue.trim()}
+              disabled={!inputValue.trim() || abortController}
               className="bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white rounded-xl p-3 transition-colors flex items-center justify-center"
             >
               <Send size={20} />
