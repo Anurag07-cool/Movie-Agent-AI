@@ -14,7 +14,7 @@ def _fetch_from_llm(prompt: str) -> dict:
     )
     try:
         response = client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": "You are a factual movie database API. You MUST return REAL, authentic movie titles, cast members, and factual details from your world knowledge. Do not use generic placeholders like 'Movie 1'. Return ONLY valid JSON. Do not include markdown formatting or extra text."},
                 {"role": "user", "content": prompt}

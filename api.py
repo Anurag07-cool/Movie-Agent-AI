@@ -65,7 +65,7 @@ async def generate_chat_stream(history: list):
             # We must use run_in_executor to not block the async event loop with synchronous OpenAI calls
             response = await asyncio.to_thread(
                 client.chat.completions.create,
-                model="llama3-70b-8192",
+                model="llama-3.1-8b-instant",
                 messages=messages,
                 tools=tools,
                 temperature=0.1

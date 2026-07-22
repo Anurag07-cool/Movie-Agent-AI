@@ -7,11 +7,26 @@ export default function Chat() {
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get('q');
   
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem('moviemate_chat_history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
   const [inputValue, setInputValue] = useState('');
+
+  // Save to localStorage whenever messages change
+  useEffect(() => {
+    localStorage.setItem('moviemate_chat_history', JSON.stringify(messages));
+  }, [messages]);
   
   useEffect(() => {
-    if (initialQuery) {
+    if (initialQuery && messages.length === 0) {
       setMessages([{ role: 'user', content: initialQuery }]);
       submitQuery(initialQuery, []);
     }
